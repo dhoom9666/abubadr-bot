@@ -1,39 +1,74 @@
+import random
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 import os
-import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
+# التوكن من Secrets في Replit
+TOKEN = os.getenv("TOKEN")
 
-class Handler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"Bot is running!")
-    def log_message(self, format, *args):
-        pass
-
-def run_server():
-    port = int(os.environ.get("PORT", 8080))
-    server = HTTPServer(("0.0.0.0", port), Handler)
-    server.serve_forever()
-
+# --- أوامر ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("أهلاً! 👋 أنا بوت أبوبدر\nأرسل لي أي رسالة وسأردّ عليها!")
+    keyboard = [
+        [InlineKeyboardButton("نكتة", callback_data='joke')],
+        [InlineKeyboardButton("اقتباس", callback_data='quote')],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(
+        "أهلاً يا أبو بدر! 🤖🔥\nاختر زر أو اكتب رسالة للتفاعل معي",
+        reply_markup=reply_markup
+    )
 
-async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_name = update.message.from_user.first_name
-    text = update.message.text
-    await update.message.reply_text(f"مرحباً {user_name}! كتبتَ: {text} 🎉")
+# --- الردود على الرسائل ---
+async def respond(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.from_user.is_bot:
+        return
 
-def main():
-    threading.Thread(target=run_server, daemon=True).start()
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT, echo))
-    print("✅ البوت شغّال!")
-    app.run_polling()
+    text = update.message.text.lower()
 
-if __name__ == "__main__":
-    main()
+    if "سلام" in text:
+        await update.message.reply_text("وعليكم السلام 🌸")
+    elif "كيفك" in text:
+        await update.message.reply_text("تمام الحمدلله 😎")
+    elif "نكتة" in text:
+        await send_joke(update)
+    elif "اقتباس" in text:
+        await send_quote(update)
+    else:
+        await update.message.reply_text(f"قلت: {update.message.text}")
+
+# --- إرسال نكتة ---
+async def send_joke(update):
+    jokes = [
+        "😂 ليش الكمبيوتر ما يلعب كرة؟ لأنه يخاف من الفيروسات!",
+        "😅 مرة واحد برمج… طلع له Error!",
+        "🤣 المعلم قال للتلميذ: صح ولا غلط؟ قال التلميذ: Ctrl+Z!"
+    ]
+    await update.message.reply_text(random.choice(jokes))
+
+# --- إرسال اقتباس ---
+async def send_quote(update):
+    quotes = [
+        "💪 الثقة بالنفس سر النجاح",
+        "🌱 من جد وجد ومن زرع حصد",
+        "✨ لا تتوقف عن المحاولة أبداً"
+    ]
+    await update.message.reply_text(random.choice(quotes))
+
+# --- الرد على الأزرار ---
+async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if query.data == "joke":
+        await send_joke(query)
+    elif query.data == "quote":
+        await send_quote(query)
+
+# --- تشغيل البوت ---
+app = ApplicationBuilder().token(TOKEN).build()
+
+app.add_handler(CommandHandler("start", start))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, respond))
+app.add_handler(CallbackQueryHandler(button))
+
+print("Bot is running 24/7 on Replit...")
+app.run_polling()
